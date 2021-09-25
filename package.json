@@ -1,0 +1,30 @@
+{
+  "name": "ctrypto-project",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "babel index.js -d dist",
+    "start": "npm run build && nodemon dist/index.js",
+    "dev": "nodemon --exec babel-node index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@babel/cli": "^7.15.7",
+    "@babel/core": "^7.15.5",
+    "@babel/node": "^7.15.4",
+    "@babel/preset-env": "^7.15.6",
+    "@binance/connector": "^1.4.0",
+    "axios": "^0.21.4",
+    "babel-polyfill": "^6.26.0",
+    "body-parser": "^1.19.0",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "crypto-js": "^4.1.1",
+    "express": "^4.17.1",
+    "node-binance-api": "^0.13.0",
+    "nodemon": "^2.0.12",
+    "rimraf": "^3.0.2"
+  }
+}
