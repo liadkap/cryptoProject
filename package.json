@@ -23,6 +23,7 @@
     "crypto": "^1.0.1",
     "crypto-js": "^4.1.1",
     "express": "^4.17.1",
+    "mongoose": "^6.0.7",
     "node-binance-api": "^0.13.0",
     "nodemon": "^2.0.12",
     "rimraf": "^3.0.2"

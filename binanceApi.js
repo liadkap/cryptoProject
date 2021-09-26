@@ -1,115 +1,70 @@
 import express from 'express';
-import axios from 'axios'
-import { createHmac } from 'crypto'
-import Binance from 'node-binance-api';
+import Order from './order'
+import { createOrders } from './binancehelper'
 
-const APIKEY = 'GfneZVevOmuWaGXz0U1lDnuZxUsmIphF55bhBSF9Do0oaAuelXe3hRuiZPGr9Onq';
-const APISECRET = 'CzYIUpJHaW75LSrZfuSV6rbte4H9s1Wz3EVsRhjq8csXqXH9F6K9c7XaV0sSCcct';
-
-const binance = new Binance().options({
-    APIKEY: APIKEY,
-    APISECRET: APISECRET
-});
 
 var router = express.Router();
 
 router.get('/', async (req, res) => {
-    const timestamp = Date.now()
-    const queryString = `timestamp=${timestamp}`
-
-    const signature = createSignature(queryString);
-    const signedQueryString = `timestamp=${timestamp}&signature=${signature}`
-
     try {
-        const { data } = await axios.get(`https://fapi.binance.com/fapi/v2/balance?${signedQueryString}`, {
-            headers: {
-                'X-MBX-APIKEY': APIKEY
-            }
-        })
-        res.send(data);
+        res.send(await binance.futuresAllOrders());
     } catch (error) {
         res.send(error);
     }
 })
 
-router.post('/stopmarket', async (req, res) => {
-
+router.post('/', async ({ query: { symbol, takeProfit, quantity, startPrice, stopLoss } }, res) => {
     const orders = [
         {
-            symbol: "ETHUSDT",
+            symbol: symbol,
             side: "BUY",
             type: "STOP_MARKET",
-            quantity:"0.001",
-            stopPrice: "3600",
+            quantity: quantity,
+            stopPrice: startPrice,
         },
         {
-            symbol: "ETHUSDT",
-            side: "SELL",
-            type: "STOP",
-            quantity:"0.001",
-            stopPrice: "2800",
-            price: "2800",
-        },
-        {
-            symbol: "ETHUSDT",
+            symbol: symbol,
             side: "SELL",
             type: "TAKE_PROFIT",
-            quantity:"0.001",
-            stopPrice: "4000",
-            price:"4000"
+            quantity: quantity,
+            stopPrice: takeProfit,
+            price: takeProfit
         }
     ]
 
     try {
-        res.send(await binance.futuresMultipleOrders(orders))
+        const result = await createOrders(orders)
+        const order = new Order({
+            orderID: result[0].orderId,
+            takeProfitOrderID: result[1].orderId,
+            status: result[0].status,
+            startPrice: startPrice,
+            takeProfitPrice: takeProfit,
+            quantity: quantity,
+            symbol: symbol,
+            stopLoss: stopLoss,
+            startTime: new Date()
+        })
+        
+        await order.save()
+        res.send(result)
     } catch (error) {
-        console.log(error);
+        res.send(result);
     }
-    // const timestamp = Date.now()
-    // const queryString = `symbol=ETHUSDT&side=BUY&type=MARKET&quantity=0.001&timestamp=${timestamp}`
-
-    // const signature = createSignature(queryString);
-    // const signedQueryString = `${queryString}&signature=${signature}`
-
-    // console.log(signedQueryString);
-    // try {
-    //     const result = await axios.post(`https://fapi.binance.com/fapi/v1/order?${signedQueryString}`, {}, {
-    //         headers: {
-    //             'X-MBX-APIKEY': APIKEY
-    //         }
-    //     })
-    //     res.send(result);
-    // } catch (error) {
-    //     res.send(error);
-    // }
 })
 
-router.delete('/stop', async (req, res) => {
-    const timestamp = Date.now()
-    const queryString = `symbol=ETHUSDT&timestamp=${timestamp}`
-
-    const signature = createSignature(queryString);
-    const signedQueryString = `symbol=ETHUSDT&timestamp=${timestamp}&signature=${signature}`
-
-    console.log(signedQueryString);
+router.delete('/', async ({ query: { id } }, res) => {
     try {
-        await axios.delete(`https://fapi.binance.com/fapi/v1/allOpenOrders?${signedQueryString}`, {
-            headers: {
-                'X-MBX-APIKEY': APIKEY
-            }
-        })
+        await cancelOrder(id)
         res.send(200);
     } catch (error) {
-        console.log(error);
+        res.send(error);
     }
 })
 
-const createSignature = (paramsString) => {
-    const hash = createHmac('sha256', APISECRET)
-        .update(paramsString)
-        .digest('hex');
-    console.log(hash);
-    return hash;
+const cancelOrder = async id => {
+    const { orderID, takeProfitOrderID, symbol } = await Order.findOne({ orderID: id });
+    const result = await Promise.all(binance.futuresCancel(symbol, { orderId: orderID }), binance.futuresCancel(symbol, { orderId: takeProfitOrderID }))
 }
 
 export default router;
